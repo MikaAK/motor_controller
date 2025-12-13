@@ -62,6 +62,20 @@ void uart_print(char *msg)
     HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
 }
 
+static inline void set_pin_high(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET); }
+static inline void set_pin_low(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET); }
+static inline void delay_ms(uint32_t ms) { HAL_Delay(ms); }
+
+static inline void set_step_high() { set_pin_high(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
+static inline void set_step_low() { set_pin_low(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
+
+static inline void cycle_step(uint8_t delay) {
+  set_step_high();
+  delay_ms(delay);
+  set_step_low();
+  delay_ms(delay);
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -97,16 +111,15 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   uart_print("=== Booting ===\r\n");
+  set_pin_high(TMC_DIR_GPIO_Port, TMC_DIR_Pin);
+  set_pin_high(TMC_EN_GPIO_Port, TMC_EN_Pin);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+  while (1) {
     /* USER CODE END WHILE */
-    HAL_GPIO_TogglePin(GPIOB, GPIO_PIN_3);
-    HAL_Delay(500);
-
+    cycle_step(1);
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
