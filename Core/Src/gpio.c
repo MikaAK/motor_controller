@@ -44,17 +44,10 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, TMC_STEP_Pin|TMC_DIR_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(TMC_DIR_GPIO_Port, TMC_DIR_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(TMC_EN_GPIO_Port, TMC_EN_Pin, GPIO_PIN_SET);
-
-  /*Configure GPIO pin : TMC_STEP_Pin */
-  GPIO_InitStruct.Pin = TMC_STEP_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_MEDIUM;
-  HAL_GPIO_Init(TMC_STEP_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : TMC_DIR_Pin TMC_EN_Pin */
   GPIO_InitStruct.Pin = TMC_DIR_Pin|TMC_EN_Pin;

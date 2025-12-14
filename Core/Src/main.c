@@ -49,6 +49,13 @@
 
 /* USER CODE BEGIN PV */
 
+
+#define APB1_CLK_HZ 16000000UL
+#define TIM3_PRESCALER 15
+#define TIM3_COUNTER_CLK_HZ (APB1_CLK_HZ / (TIM3_PRESCALER + 1))
+#define MAX_VELOCITY 6500
+#define MIN_VELOCITY 10
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -73,9 +80,6 @@ static inline void set_pin_low(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_Writ
 static inline void toggle_pin(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_TogglePin(port, pin); }
 static inline void delay_ms(uint32_t ms) { HAL_Delay(ms); }
 
-static inline void set_step_high() { set_pin_high(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
-static inline void set_step_low() { set_pin_low(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
-
 static inline void enable_motor() {
   printf("Enabling motor...\r\n");
 
@@ -99,41 +103,47 @@ static inline void set_dir_low() {
   set_pin_low(TMC_DIR_GPIO_Port, TMC_DIR_Pin);
 }
 
-static inline void toggle_step() {
-  toggle_pin(TMC_STEP_GPIO_Port, TMC_STEP_Pin);
-}
+static inline void set_step_period(int steps_per_sec) {
+  if (steps_per_sec == 0) steps_per_sec = 1;
 
-static inline void set_step_period(int step_period) {
-  __HAL_TIM_SET_AUTORELOAD(&htim2, step_period);
+  uint32_t arr = (TIM3_COUNTER_CLK_HZ / steps_per_sec);
+
+  if (arr < 2) arr = 2;               // keep CCR valid and avoid insane frequency
+  if (arr > 0xFFFF) arr = 0xFFFF;     // TIM3 is 16-bit on STM32G4
+
+  __HAL_TIM_SET_AUTORELOAD(&htim3, arr - 1);
+  __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, (arr - 1) / 2);
 }
 
 
 // Motion
 typedef struct {
-  int current_delay;
-  int target_delay;
+  int current_velocity;
+  int target_velocity;
   int accel_step;
   int direction;
 } stepper_motion_t;
 
-stepper_motion_t motion;
+static volatile stepper_motion_t motion;
+
+static inline void set_velocity_target(int velocity) {
+  motion.target_velocity = velocity;
+}
+
+static inline void set_velocity(int velocity) {
+  motion.current_velocity = velocity;
+  set_step_period(motion.current_velocity);
+}
 
 static inline void initialize_motion() {
   motion.accel_step = 0;
   motion.direction = 0;
-}
-
-static inline void set_delay_target(int delay) {
-  motion.target_delay = delay;
-}
-
-static inline void set_delay(int delay) {
-  motion.current_delay = delay;
-  set_step_period(motion.current_delay);
+  set_velocity(MIN_VELOCITY);
+  set_velocity_target(MIN_VELOCITY);
 }
 
 static inline bool is_move_done() {
-  return motion.current_delay == motion.target_delay;
+  return motion.current_velocity == motion.target_velocity;
 }
 
 static inline void set_accel(int steps) {
@@ -141,14 +151,10 @@ static inline void set_accel(int steps) {
 }
 
 static inline void update_move() {
-  if (motion.current_delay == motion.target_delay) {
-    printf("accel done\r\n");
-  } else if (motion.current_delay > motion.target_delay) {
-    set_delay(max_int(motion.current_delay - motion.accel_step, motion.target_delay));
-    printf("target %d, accel up: %d\r\n", motion.target_delay, motion.current_delay);
-  } else if (motion.current_delay < motion.target_delay) {
-    set_delay(min_int(motion.current_delay + motion.accel_step, motion.target_delay));
-    printf("target %d, accel down: %d\r\n", motion.target_delay, motion.current_delay);
+  if (motion.current_velocity > motion.target_velocity) {
+    set_velocity(max_int(motion.current_velocity - motion.accel_step, motion.target_velocity));
+  } else if (motion.current_velocity < motion.target_velocity) {
+    set_velocity(min_int(motion.current_velocity + motion.accel_step, motion.target_velocity));
   }
 }
 
@@ -196,31 +202,32 @@ int main(void)
   MX_GPIO_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
+  MX_TIM3_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
 
   printf("=== Booting ===\r\n");
   initialize_motion();
   enable_motor();
-  set_accel(2);
-  set_delay(50);
-  set_delay_target(15);
+
+  set_accel(4);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
-    /* USER CODE END WHILE */
-    update_move();
-    delay_ms(1000);
-
     if (is_move_done()) {
-      if (motion.target_delay == 15) {
-        set_delay_target(50);
+      printf("=== Move done ===\r\n");
+      if (motion.target_velocity == MAX_VELOCITY) {
+        set_velocity_target(MIN_VELOCITY);
       } else {
-        set_delay_target(15);
+        change_direction();
+        set_velocity_target(MAX_VELOCITY);
       }
     }
+    /* USER CODE END WHILE */
+
     /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
@@ -270,7 +277,14 @@ void SystemClock_Config(void)
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
   if (htim->Instance == TIM2) {
-    toggle_step();
+    static uint32_t n = 0;
+    n++;
+
+    update_move();
+
+    if ((n % 100) == 0) { // once per 100 ticks
+      printf("current_velocity=%d target=%d\r\n", motion.current_velocity, motion.target_velocity);
+    }
   }
 }
 
