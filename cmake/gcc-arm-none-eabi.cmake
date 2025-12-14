@@ -5,8 +5,13 @@ set(CMAKE_C_COMPILER_ID GNU)
 set(CMAKE_CXX_COMPILER_ID GNU)
 
 # Some default GCC settings
-# arm-none-eabi- must be part of path environment
-set(TOOLCHAIN_PREFIX                arm-none-eabi-)
+# Prefer vendored toolchain if present; otherwise rely on PATH.
+set(VENDORED_TOOLCHAIN_BIN "${CMAKE_SOURCE_DIR}/arm/arm-gnu-toolchain-14.3.rel1-darwin-arm64-arm-none-eabi/bin")
+if(EXISTS "${VENDORED_TOOLCHAIN_BIN}/arm-none-eabi-gcc")
+  set(TOOLCHAIN_PREFIX "${VENDORED_TOOLCHAIN_BIN}/arm-none-eabi-")
+else()
+  set(TOOLCHAIN_PREFIX arm-none-eabi-)
+endif()
 
 set(CMAKE_C_COMPILER                ${TOOLCHAIN_PREFIX}gcc)
 set(CMAKE_ASM_COMPILER              ${CMAKE_C_COMPILER})

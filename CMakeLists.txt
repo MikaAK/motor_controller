@@ -28,8 +28,8 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 project(${CMAKE_PROJECT_NAME})
 message("Build type: " ${CMAKE_BUILD_TYPE})
 
-# Enable CMake support for ASM and C languages
-enable_language(C ASM)
+# Enable CMake support for ASM, C, and C++ languages
+enable_language(C CXX ASM)
 
 # Create an executable object type
 add_executable(${CMAKE_PROJECT_NAME})
@@ -56,11 +56,28 @@ target_link_directories(${CMAKE_PROJECT_NAME} PRIVATE
 # Add sources to executable
 target_sources(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user sources here
+    ${CMAKE_SOURCE_DIR}/Core/Src/tmc2209.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/tmc_platform.c
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/tmc_hal_uart_stream.cpp
+
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/TMCStepper.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/TMC2208Stepper.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/TMC2209Stepper.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/GCONF.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/CHOPCONF.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/IHOLD_IRUN.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/PWMCONF.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/DRV_STATUS.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/DRVSTATUS.cpp
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source/COOLCONF.cpp
 )
 
 # Add include paths
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     # Add user defined include paths
+    ${CMAKE_SOURCE_DIR}/Core/Inc
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src
+    ${CMAKE_SOURCE_DIR}/lib/TMCStepper/src/source
 )
 
 # Add project symbols (macros)
