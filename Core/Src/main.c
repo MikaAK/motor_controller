@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "tim.h"
 #include "usart.h"
 #include "gpio.h"
 
@@ -25,6 +26,7 @@
 /* USER CODE BEGIN Includes */
 #include "string.h"
 #include "stdio.h"
+#include "stdbool.h"
 
 /* USER CODE END Includes */
 
@@ -58,80 +60,105 @@ void SystemClock_Config(void);
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
 
-void uart_print(char *msg)
-{
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+static inline int min_int(int a, int b) {
+  return (a < b) ? a : b;
+}
+
+static inline int max_int(int a, int b) {
+  return (a > b) ? a : b;
 }
 
 static inline void set_pin_high(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_WritePin(port, pin, GPIO_PIN_SET); }
 static inline void set_pin_low(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_WritePin(port, pin, GPIO_PIN_RESET); }
+static inline void toggle_pin(GPIO_TypeDef *port, uint16_t pin) { HAL_GPIO_TogglePin(port, pin); }
 static inline void delay_ms(uint32_t ms) { HAL_Delay(ms); }
 
 static inline void set_step_high() { set_pin_high(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
 static inline void set_step_low() { set_pin_low(TMC_STEP_GPIO_Port, TMC_STEP_Pin); }
 
 static inline void enable_motor() {
-  uart_print("Enabling motor...\r\n");
+  printf("Enabling motor...\r\n");
 
   set_pin_low(TMC_EN_GPIO_Port, TMC_EN_Pin);
 }
 static inline void disable_motor() {
-  uart_print("Disable motor...\r\n");
+  printf("Disable motor...\r\n");
 
   set_pin_high(TMC_EN_GPIO_Port, TMC_EN_Pin);
 }
 
 static inline void set_dir_high() {
-  uart_print("Set direction high...\r\n");
+  printf("Set direction high...\r\n");
 
   set_pin_high(TMC_DIR_GPIO_Port, TMC_DIR_Pin);
 }
 
 static inline void set_dir_low() {
-  uart_print("Set direction low...\r\n");
+  printf("Set direction low...\r\n");
 
   set_pin_low(TMC_DIR_GPIO_Port, TMC_DIR_Pin);
 }
 
-static inline void cycle_step(int delay) {
-  set_step_high();
-  delay_ms(delay);
-  set_step_low();
-  delay_ms(delay);
+static inline void toggle_step() {
+  toggle_pin(TMC_STEP_GPIO_Port, TMC_STEP_Pin);
 }
+
+static inline void set_step_period(int step_period) {
+  __HAL_TIM_SET_AUTORELOAD(&htim2, step_period);
+}
+
 
 // Motion
 typedef struct {
   int current_delay;
   int target_delay;
   int accel_step;
-  int steps_since_last_accel;
+  int direction;
 } stepper_motion_t;
 
 stepper_motion_t motion;
 
-static inline void start_move(int start_delay, int target_delay) {
-  motion.current_delay = start_delay;
-  motion.target_delay  = target_delay;
-  motion.accel_step    = 1;
-
-  motion.steps_since_last_accel    = 0;
+static inline void initialize_motion() {
+  motion.accel_step = 0;
+  motion.direction = 0;
 }
 
-static inline void update_motion(void) {
-  cycle_step(motion.current_delay);
+static inline void set_delay_target(int delay) {
+  motion.target_delay = delay;
+}
 
-  if (motion.steps_since_last_accel > 10) {
-    uart_print("Accelerating motor...\r\n");
-    if (motion.current_delay > motion.target_delay)
-      motion.current_delay -= motion.accel_step;
+static inline void set_delay(int delay) {
+  motion.current_delay = delay;
+  set_step_period(motion.current_delay);
+}
 
-    if (motion.current_delay < motion.target_delay)
-      motion.current_delay -= motion.accel_step;
+static inline bool is_move_done() {
+  return motion.current_delay == motion.target_delay;
+}
 
-    motion.steps_since_last_accel = 0;
+static inline void set_accel(int steps) {
+  motion.accel_step = steps;
+}
+
+static inline void update_move() {
+  if (motion.current_delay == motion.target_delay) {
+    printf("accel done\r\n");
+  } else if (motion.current_delay > motion.target_delay) {
+    set_delay(max_int(motion.current_delay - motion.accel_step, motion.target_delay));
+    printf("target %d, accel up: %d\r\n", motion.target_delay, motion.current_delay);
+  } else if (motion.current_delay < motion.target_delay) {
+    set_delay(min_int(motion.current_delay + motion.accel_step, motion.target_delay));
+    printf("target %d, accel down: %d\r\n", motion.target_delay, motion.current_delay);
+  }
+}
+
+static inline void change_direction(void) {
+  if (motion.direction == 0) {
+    set_dir_high();
+    motion.direction = 1;
   } else {
-    motion.steps_since_last_accel++;
+    set_dir_low();
+    motion.direction = 0;
   }
 }
 
@@ -161,32 +188,40 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
+  HAL_InitTick(TICK_INT_PRIORITY);
 
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+  HAL_TIM_Base_Start_IT(&htim2);
 
-  uart_print("=== Booting ===\r\n");
-  set_dir_high();
+  printf("=== Booting ===\r\n");
+  initialize_motion();
   enable_motor();
+  set_accel(2);
+  set_delay(50);
+  set_delay_target(15);
   /* USER CODE END 2 */
-
-
-  start_move(50, 1);
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1) {
     /* USER CODE END WHILE */
+    update_move();
+    delay_ms(1000);
 
-
-    update_motion();
-
-    // How is this faster??:
-    // cycle_step(0);
+    if (is_move_done()) {
+      if (motion.target_delay == 15) {
+        set_delay_target(50);
+      } else {
+        set_delay_target(15);
+      }
+    }
+    /* USER CODE BEGIN 3 */
   }
   /* USER CODE END 3 */
 }
@@ -232,6 +267,13 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+  if (htim->Instance == TIM2) {
+    toggle_step();
+  }
+}
+
 
 /* USER CODE END 4 */
 
