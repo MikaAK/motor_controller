@@ -59,12 +59,31 @@ void tmc2209_init(void) {
   driver_instance->begin();
   driver_instance->toff(TMC2209_TOFF);
   driver_instance->blank_time(TMC2209_BLANK_TIME);
-  driver_instance->rms_current(TMC2209_RUN_CURRENT_MA);
+
+  driver_instance->intpol(TMC2209_ENABLE_INTERPOLATE != 0u);
+
   driver_instance->microsteps(TMC2209_MICROSTEPS);
   driver_instance->en_spreadCycle(TMC2209_ENABLE_SPREADCYCLE != 0u);
   driver_instance->pwm_autoscale(TMC2209_ENABLE_PWM_AUTOSCALE != 0u);
   driver_instance->pdn_disable(TMC2209_ENABLE_PDN_DISABLE != 0u);
+
+  driver_instance->ihold(hold_current_to_cs(TMC2209_HOLD_CURRENT_MA));
+  driver_instance->irun(run_current_to_cs(TMC2209_RUN_CURRENT_MA));
+  driver_instance->iholddelay(TMC2209_HOLD_DELAY);
   driver_instance->I_scale_analog(TMC2209_ENABLE_I_SCALE_ANALOG != 0u);
+
+  // Swap to stealthchop at theashold
+  driver_instance->TPWMTHRS(TMC2209_SILENT_THRESHOLD_TPWMTHRS);
+
+  // Setup coolstep
+  // driver_instance->TCOOLTHRS(200); // Enable CoolStep above this speed
+  // driver_instance->semin(5);
+  // driver_instance->semax(2);
+  // driver_instance->sedn(0b01);
+  // driver_instance->seup(0b01);
+
+  // Setup stallguard
+  // driver_instance->SGTHRS(8);  // Tune experimentally
 }
 
 void tmc2209_set_run_current(uint16_t milliamps) {
@@ -72,7 +91,7 @@ void tmc2209_set_run_current(uint16_t milliamps) {
     return;
   }
 
-  driver_instance->irun(run_current_to_cs(milliamps));
+  driver_instance->irun(milliamps);
 }
 
 void tmc2209_set_hold_current(uint16_t milliamps) {
@@ -80,7 +99,7 @@ void tmc2209_set_hold_current(uint16_t milliamps) {
     return;
   }
 
-  driver_instance->ihold(hold_current_to_cs(milliamps));
+  driver_instance->ihold(milliamps);
 }
 
 void tmc2209_set_microsteps(uint16_t microsteps) {

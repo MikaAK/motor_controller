@@ -55,7 +55,7 @@
 #define APB1_CLK_HZ 16000000UL
 #define TIM3_PRESCALER 15
 #define TIM3_COUNTER_CLK_HZ (APB1_CLK_HZ / (TIM3_PRESCALER + 1))
-#define MAX_VELOCITY 3000
+#define MAX_VELOCITY 6800
 #define MIN_VELOCITY 10
 
 /* USER CODE END PV */
@@ -202,10 +202,10 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_USART1_UART_Init();
   MX_USART2_UART_Init();
   MX_TIM2_Init();
   MX_TIM3_Init();
+  MX_USART1_UART_Init();
   /* USER CODE BEGIN 2 */
   HAL_TIM_Base_Start_IT(&htim2);
   HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);
