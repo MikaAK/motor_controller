@@ -18,6 +18,23 @@ set(CMAKE_SIZE    "${TOOLCHAIN_BIN}/arm-none-eabi-size")
 # IMPORTANT: prevents CMake from trying to run produced binaries during configure
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
+set(ARM_CPU_FLAGS "-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard")
+
+set(CMAKE_C_FLAGS_INIT   "${ARM_CPU_FLAGS}")
+set(CMAKE_CXX_FLAGS_INIT "${ARM_CPU_FLAGS}")
+set(CMAKE_ASM_FLAGS_INIT "${ARM_CPU_FLAGS}")
+
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARM_CPU_FLAGS}")
+set(CMAKE_ASM_FLAGS "${CMAKE_C_FLAGS} -x assembler-with-cpp -MMD -MP")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall -fdata-sections -ffunction-sections")
+
+set(CMAKE_C_FLAGS_DEBUG "-O0 -g3")
+set(CMAKE_C_FLAGS_RELEASE "-Os -g0")
+set(CMAKE_CXX_FLAGS_DEBUG "-O0 -g3")
+set(CMAKE_CXX_FLAGS_RELEASE "-Os -g0")
+
+set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -fno-rtti -fno-exceptions -fno-threadsafe-statics")
+
 # IMPORTANT: stop CMake from “finding” macOS headers/libs/tools
 set(CMAKE_FIND_ROOT_PATH "${TOOLCHAIN_ROOT}")
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
